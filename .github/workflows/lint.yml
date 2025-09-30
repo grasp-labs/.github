@@ -1,0 +1,167 @@
+name: Lint and Validate
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  markdown-lint:
+    runs-on: ubuntu-latest
+    name: Lint Markdown files
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Lint Markdown files
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: '**/*.md'
+
+  yaml-lint:
+    runs-on: ubuntu-latest
+    name: Lint YAML files
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Lint YAML files
+        run: yamllint .
+
+  python-lint:
+    runs-on: ubuntu-latest
+    name: Lint Python files
+    if: ${{ hashFiles('**/*.py') != '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install linting tools
+        run: |
+          pip install flake8 black isort mypy
+
+      - name: Lint with flake8
+        run: flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+      - name: Check formatting with black
+        run: black --check .
+
+      - name: Check import sorting with isort
+        run: isort --check-only .
+
+      - name: Type check with mypy
+        run: mypy . --ignore-missing-imports
+        continue-on-error: true
+
+  go-lint:
+    runs-on: ubuntu-latest
+    name: Lint Go files
+    if: ${{ hashFiles('**/*.go') != '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+
+  rust-lint:
+    runs-on: ubuntu-latest
+    name: Lint Rust files
+    if: ${{ hashFiles('**/Cargo.toml') != '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  js-ts-lint:
+    runs-on: ubuntu-latest
+    name: Lint JavaScript and TypeScript files
+    if: ${{ hashFiles('**/*.js', '**/*.ts', '**/*.jsx', '**/*.tsx') != '' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install ESLint and Prettier
+        run: |
+          npm install --global eslint @typescript-eslint/parser @typescript-eslint/eslint-plugin prettier
+
+      - name: Create ESLint config
+        run: |
+          cat > .eslintrc.json << 'EOF'
+          {
+            "env": {
+              "browser": true,
+              "es2021": true,
+              "node": true
+            },
+            "extends": [
+              "eslint:recommended",
+              "@typescript-eslint/recommended"
+            ],
+            "parser": "@typescript-eslint/parser",
+            "parserOptions": {
+              "ecmaVersion": 12,
+              "sourceType": "module"
+            },
+            "plugins": ["@typescript-eslint"],
+            "rules": {}
+          }
+          EOF
+
+      - name: Lint JavaScript and TypeScript files
+        run: eslint '**/*.{js,ts,jsx,tsx}' --ignore-pattern 'node_modules/'
+        continue-on-error: true
+
+      - name: Check formatting with Prettier
+        run: prettier --check '**/*.{js,ts,jsx,tsx,json,css,md}' --ignore-path .gitignore
+        continue-on-error: true
+
+  validate-codeowners:
+    runs-on: ubuntu-latest
+    name: Validate CODEOWNERS
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate CODEOWNERS
+        uses: mszostok/codeowners-validator@v0.7.4
+        with:
+          checks: "files,owners,duppatterns"
+          experimental_checks: "notowned"

@@ -1,0 +1,20 @@
+# Global Owners
+* @grasp-labs/grasp-admin @Skerve
+
+# Documentation
+# *.md @grasp-labs/docs-team
+# docs/ @grasp-labs/docs-team
+
+# Configuration files
+*.yml @grasp-labs/team-infrastructure
+*.yaml @grasp-labs/team-infrastructure
+# *.json @grasp-labs/devops
+
+# GitHub workflows and templates
+.github/ @grasp-labs/team-infrastructure @grasp-labs/grasp-admin
+
+# Security policies
+SECURITY.md @grasp-labs/team-infrastructure @grasp-labs/grasp-admin
+
+# License and legal documents
+LICENSE @grasp-labs/grasp-admin 
