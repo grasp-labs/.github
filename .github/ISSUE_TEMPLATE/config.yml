@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Community Discussion (NOT AVAILABLE)
+    url: https://github.com/grasp-labs/community/discussions
+    about: Join our community discussions for questions and general chat
+  - name: 📖 Documentation (NOT AVAILABLE)
+    url: https://docs.grasp-labs.com
+    about: Check our documentation for answers to common questions
+  - name: 🔒 Security Issues
+    url: https://github.com/grasp-labs/.github/security/policy
+    about: Please report security vulnerabilities through our security policy
