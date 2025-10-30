@@ -1,0 +1,33 @@
+# Global Owners - These users/teams will be requested for review on all PRs
+* @grasp-labs/grasp-admin @Skerve
+
+# Documentation - Community health files and documentation
+*.md @grasp-labs/grasp-admin
+docs/ @grasp-labs/grasp-admin
+README.md @grasp-labs/grasp-admin
+
+# Configuration files - Organization-wide linting standards
+*.yml @grasp-labs/team-infrastructure
+*.yaml @grasp-labs/team-infrastructure
+*.json @grasp-labs/team-infrastructure
+
+# Workflow configuration files - Critical for organization standards
+.github/workflows/configs/ @grasp-labs/team-infrastructure @grasp-labs/grasp-admin
+
+# GitHub workflows and templates
+.github/ @grasp-labs/team-infrastructure @grasp-labs/grasp-admin
+.github/workflows/ @grasp-labs/team-infrastructure
+
+# Reusable workflows - Critical infrastructure components
+.github/workflows/lint-*.yml @grasp-labs/team-infrastructure
+.github/workflows/validate-*.yml @grasp-labs/team-infrastructure
+
+# Terraform-specific workflows and configs - Require infrastructure team
+.github/workflows/lint-terraform.yml @grasp-labs/team-infrastructure @Yuan1979
+.github/workflows/configs/.tflint.hcl @grasp-labs/team-infrastructure @Yuan1979
+
+# Security policies - Require security team approval
+SECURITY.md @grasp-labs/team-infrastructure @grasp-labs/grasp-admin
+
+# Critical organization files - Require both teams
+CODEOWNERS @grasp-labs/team-infrastructure @grasp-labs/grasp-admin

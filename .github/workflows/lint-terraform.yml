@@ -1,0 +1,210 @@
+name: Terraform Lint
+
+on:
+  workflow_call:
+    inputs:
+      terraform-version:
+        description: 'Terraform version to use'
+        required: false
+        type: string
+        default: 'latest'
+      tflint-version:
+        description: 'TFLint version to use'
+        required: false
+        type: string
+        default: 'latest'
+      working-directory:
+        description: 'Working directory for Terraform files'
+        required: false
+        type: string
+        default: '.'
+      config-file:
+        description: 'TFLint configuration file'
+        required: false
+        type: string
+        default: '.tflint.hcl'
+
+jobs:
+  terraform-lint:
+    runs-on: ubuntu-latest
+    name: Lint Terraform files
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.terraform-version }}
+
+      - name: Download organization TFLint config if not present
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [ ! -f "${{ inputs.config-file }}" ]; then
+            echo "No local TFLint config found, downloading organization default..."
+            curl -s -f https://raw.githubusercontent.com/grasp-labs/.github/main/.github/workflows/configs/.tflint.hcl \
+              -o .tflint.hcl || echo "Organization TFLint config not available"
+          fi
+
+      - name: Cache TFLint plugin dir
+        uses: actions/cache@v4
+        with:
+          path: ~/.tflint.d/plugins
+          key: ${{ runner.os }}-tflint-${{ hashFiles('**/.tflint.hcl') }}
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: ${{ inputs.tflint-version }}
+
+      - name: Initialize TFLint
+        working-directory: ${{ inputs.working-directory }}
+        run: tflint --init
+
+      - name: Terraform format check
+        working-directory: ${{ inputs.working-directory }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform validate
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          find . -name "*.tf" -exec dirname {} \; | sort -u | while read dir; do
+            echo "Validating $dir"
+            (cd "$dir" && terraform init -backend=false && terraform validate)
+          done
+
+      - name: Validate backend bucket naming
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          echo "Validating S3 backend bucket naming..."
+
+          # Find all Terraform files with backend configuration
+          backend_files=$(find . -name "*.tf" -exec grep -l "backend.*s3" {} \;)
+
+          if [ -n "$backend_files" ]; then
+            echo "Found backend configurations in: $backend_files"
+
+            # Check each file for correct bucket name
+            for file in $backend_files; do
+              echo "Checking $file..."
+
+              # Extract bucket name from backend configuration
+              bucket_name=$(grep -A 10 "backend.*s3" "$file" | grep -E "bucket\s*=" | sed 's/.*bucket\s*=\s*"\([^"]*\)".*/\1/' | tr -d ' ')
+
+              if [ -n "$bucket_name" ]; then
+                echo "Found bucket: $bucket_name"
+
+                if [ "$bucket_name" != "grasptfstates" ]; then
+                  echo "❌ ERROR: Backend bucket '$bucket_name' in $file should be 'grasptfstates'"
+                  echo "Please update the backend configuration to use bucket 'grasptfstates'"
+                  exit 1
+                else
+                  echo "✅ Backend bucket '$bucket_name' is correct"
+                fi
+              fi
+            done
+          else
+            echo "No S3 backend configurations found"
+          fi
+
+      - name: Validate locals block conventions
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          echo "Validating Terraform locals block conventions..."
+
+          # Find all Terraform files with locals block
+          locals_files=$(find . -name "*.tf" -exec grep -l "locals\s*{" {} \;)
+
+          if [ -n "$locals_files" ]; then
+            echo "Found locals blocks in: $locals_files"
+
+            # Check each file for required locals
+            for file in $locals_files; do
+              echo "Checking locals in $file..."
+
+              # Extract locals block content
+              locals_content=$(awk '/locals\s*{/,/^}/' "$file")
+
+              # Check for required fields
+              domain_found=$(echo "$locals_content" | grep -E "domain\s*=" | head -1)
+              service_group_name_found=$(echo "$locals_content" | grep -E "service_group_name\s*=" | head -1)
+              environment_found=$(echo "$locals_content" | grep -E "environment\s*=" | head -1)
+              base_name_found=$(echo "$locals_content" | grep -E "base_name\s*=" | head -1)
+              app_found=$(echo "$locals_content" | grep -E "app\s*=" | head -1)
+
+              # Validate domain is "ds"
+              if [ -n "$domain_found" ]; then
+                domain_value=$(echo "$domain_found" | sed 's/.*=\s*"\([^"]*\)".*/\1/' | tr -d ' ')
+                if [ "$domain_value" != "ds" ]; then
+                  echo "❌ ERROR: domain in $file should be 'ds', found '$domain_value'"
+                  exit 1
+                else
+                  echo "✅ domain is correctly set to 'ds'"
+                fi
+              else
+                echo "❌ ERROR: Missing required 'domain' in locals block in $file"
+                exit 1
+              fi
+
+              # Check required fields exist and validate service_group_name
+              if [ -z "$service_group_name_found" ]; then
+                echo "❌ ERROR: Missing required 'service_group_name' in locals block in $file"
+                exit 1
+              else
+                # Validate service_group_name is one of allowed values
+                service_group_value=$(echo "$service_group_name_found" | sed 's/.*=\s*"\([^"]*\)".*/\1/' | tr -d ' ')
+                if [[ "$service_group_value" != "core" && "$service_group_value" != "consumption" && "$service_group_value" != "auxiliary" ]]; then
+                  echo "❌ ERROR: service_group_name in $file must be one of: core, consumption, auxiliary. Found: '$service_group_value'"
+                  exit 1
+                else
+                  echo "✅ service_group_name is valid: '$service_group_value'"
+                fi
+              fi
+
+              if [ -z "$environment_found" ]; then
+                echo "❌ ERROR: Missing required 'environment' in locals block in $file"
+                exit 1
+              else
+                echo "✅ environment found"
+              fi
+
+              if [ -z "$base_name_found" ]; then
+                echo "❌ ERROR: Missing required 'base_name' in locals block in $file"
+                exit 1
+              else
+                echo "✅ base_name found"
+              fi
+
+              if [ -z "$app_found" ]; then
+                echo "❌ ERROR: Missing required 'app' in locals block in $file"
+                exit 1
+              else
+                echo "✅ app found"
+              fi
+
+              # Validate base_name follows convention: domain-service_group_name-service_name
+              base_name_pattern=$(echo "$base_name_found" | grep -E 'base_name\s*=\s*"\$\{local\.domain\}-\$\{local\.service_group_name\}-\$\{local\.service_name\}"')
+              if [ -z "$base_name_pattern" ]; then
+                echo "❌ ERROR: base_name in $file should follow pattern: \"\${local.domain}-\${local.service_group_name}-\${local.service_name}\""
+                exit 1
+              else
+                echo "✅ base_name follows naming convention"
+              fi
+
+              # Validate app follows convention: domain-service_group_name-service_name-environment
+              app_pattern=$(echo "$app_found" | grep -E 'app\s*=\s*"\$\{local\.domain\}-\$\{local\.service_group_name\}-\$\{local\.service_name\}-\$\{local\.environment\}"')
+              if [ -z "$app_pattern" ]; then
+                echo "❌ ERROR: app in $file should follow pattern: \"\${local.domain}-\${local.service_group_name}-\${local.service_name}-\${local.environment}\""
+                exit 1
+              else
+                echo "✅ app follows naming convention"
+              fi
+
+            done
+          else
+            echo "⚠️  No locals blocks found - this may be acceptable for some Terraform configurations"
+          fi
+
+      - name: Run TFLint
+        working-directory: ${{ inputs.working-directory }}
+        run: tflint --recursive --format compact
