@@ -1,9 +1,17 @@
-## Reporting Security Issues
+# Security policy
 
-Grasp Labs is dedicated to the responsible disclosure of security vulnerabilities.  
-  
-We kindly ask that you **do not** open a public GitHub issue to report security concerns.  
-  
-Instead, please send your report via [email](mailto:hello@grasplabs.no).  
-  
-Thank you in advance for collaborating with us to help protect our customers.
+Do not report suspected vulnerabilities in a public issue, discussion, pull
+request, or chat.
+
+Email `hello@aider.no` with the subject `[Security]`, including:
+
+- the affected repository, version, or service;
+- a clear description and potential impact;
+- reproduction steps or a minimal proof of concept;
+- any known mitigations;
+- a safe way to contact you.
+
+Do not access data that is not yours, disrupt services, or disclose a suspected
+vulnerability before the Commons team has had a reasonable opportunity to
+assess it. We will acknowledge the report and coordinate next steps through the
+private channel.
