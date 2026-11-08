@@ -3,7 +3,7 @@
 Do not report suspected vulnerabilities in a public issue, discussion, pull
 request, or chat.
 
-Email `hello@grasplabs.no` with the subject `[Security]`, including:
+Email `hello@aider.no` with the subject `[Security]`, including:
 
 - the affected repository, version, or service;
 - a clear description and potential impact;
